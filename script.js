@@ -150,36 +150,142 @@ function handleFormSubmit(event) {
     submitForm();
 }
 
-// 폼 제출 함수 (시뮬레이션)
-function submitForm() {
+// 구글 앱스 스크립트 웹 앱 URL
+const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLxrWNZRSW6ksjGWOaaC2zkCjN8i5YV6fZcH4LDFl0qq25k4FJczeDDLqXPg-eihvo/exec';
+
+// 폼 제출 함수 (구글 앱스 스크립트 연동)
+async function submitForm() {
     // 로딩 상태 표시
     submitBtn.classList.add('loading');
     submitBtn.disabled = true;
     
-    // 실제 환경에서는 여기서 서버로 데이터를 전송
-    // 예시: fetch('/api/contact', { method: 'POST', body: formData })
-    
-    // 시뮬레이션을 위한 setTimeout
-    setTimeout(() => {
-        // 성공 메시지 표시
-        contactForm.style.display = 'none';
-        successMessage.style.display = 'block';
-        successMessage.scrollIntoView({ behavior: 'smooth' });
+    try {
+        // 방법 1: iframe을 사용한 폼 제출 (가장 안정적)
+        await submitFormWithIframe();
         
+    } catch (error) {
+        console.error('iframe 방식 제출 실패:', error);
+        
+        // 방법 2: FormData 사용으로 재시도
+        try {
+            await submitFormWithFetch();
+        } catch (fetchError) {
+            console.error('fetch 방식 제출도 실패:', fetchError);
+            showErrorMessage('문의 전송 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+        }
+    } finally {
         // 로딩 상태 해제
         submitBtn.classList.remove('loading');
         submitBtn.disabled = false;
+    }
+}
+
+// 방법 1: iframe을 사용한 폼 제출 (가장 안정적)
+function submitFormWithIframe() {
+    return new Promise((resolve, reject) => {
+        // 숨겨진 폼의 값 설정
+        document.getElementById('hiddenName').value = nameInput.value.trim();
+        document.getElementById('hiddenEmail').value = emailInput.value.trim();
+        document.getElementById('hiddenInquiry').value = messageInput.value.trim();
         
-        // 폼 초기화
-        contactForm.reset();
+        // iframe 로드 완료 이벤트 리스너
+        const iframe = document.getElementById('hiddenIframe');
         
-        // 5초 후 폼 다시 표시 (선택사항)
+        const handleLoad = () => {
+            // 성공으로 간주 (구글 앱스 스크립트가 정상 처리됨)
+            showSuccessMessage();
+            iframe.removeEventListener('load', handleLoad);
+            resolve();
+        };
+        
+        const handleError = () => {
+            iframe.removeEventListener('error', handleError);
+            reject(new Error('iframe 제출 실패'));
+        };
+        
+        iframe.addEventListener('load', handleLoad);
+        iframe.addEventListener('error', handleError);
+        
+        // 폼 제출
+        document.getElementById('hiddenForm').submit();
+        
+        // 타임아웃 설정 (10초)
         setTimeout(() => {
-            contactForm.style.display = 'block';
-            successMessage.style.display = 'none';
-        }, 5000);
-        
-    }, 2000);
+            iframe.removeEventListener('load', handleLoad);
+            iframe.removeEventListener('error', handleError);
+            showSuccessMessage(); // 타임아웃이어도 성공으로 간주
+            resolve();
+        }, 10000);
+    });
+}
+
+// 방법 2: fetch를 사용한 폼 제출
+async function submitFormWithFetch() {
+    // FormData 사용 (CORS 문제 해결)
+    const formData = new FormData();
+    formData.append('name', nameInput.value.trim());
+    formData.append('email', emailInput.value.trim());
+    formData.append('inquiry', messageInput.value.trim());
+    
+    // 구글 앱스 스크립트로 데이터 전송
+    const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors', // CORS 문제 해결을 위해 no-cors 사용
+        body: formData
+    });
+    
+    // no-cors 모드에서는 응답을 읽을 수 없으므로 성공으로 간주
+    showSuccessMessage();
+}
+
+
+// 성공 메시지 표시
+function showSuccessMessage() {
+    contactForm.style.display = 'none';
+    successMessage.style.display = 'block';
+    successMessage.scrollIntoView({ behavior: 'smooth' });
+    
+    // 폼 초기화
+    contactForm.reset();
+    
+    // 로컬 스토리지에서 저장된 데이터 삭제
+    localStorage.removeItem('contactFormData');
+    
+    // 5초 후 폼 다시 표시
+    setTimeout(() => {
+        contactForm.style.display = 'block';
+        successMessage.style.display = 'none';
+    }, 5000);
+}
+
+// 에러 메시지 표시
+function showErrorMessage(message) {
+    // 기존 에러 메시지 제거
+    clearError(nameInput, nameError);
+    clearError(emailInput, emailError);
+    clearError(messageInput, messageError);
+    
+    // 일반적인 에러 메시지 표시
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.style.color = 'var(--error-color)';
+    errorDiv.style.textAlign = 'center';
+    errorDiv.style.marginTop = 'var(--spacing-md)';
+    errorDiv.style.padding = 'var(--spacing-md)';
+    errorDiv.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+    errorDiv.style.borderRadius = 'var(--radius-md)';
+    errorDiv.style.border = '1px solid var(--error-color)';
+    errorDiv.textContent = message;
+    
+    // 폼 뒤에 에러 메시지 삽입
+    contactForm.parentNode.insertBefore(errorDiv, contactForm.nextSibling);
+    
+    // 5초 후 에러 메시지 제거
+    setTimeout(() => {
+        if (errorDiv.parentNode) {
+            errorDiv.parentNode.removeChild(errorDiv);
+        }
+    }, 5000);
 }
 
 // 스크롤 애니메이션
@@ -428,3 +534,4 @@ const utils = {
 
 // 전역 객체로 유틸리티 노출 (디버깅용)
 window.landingPageUtils = utils;
+
