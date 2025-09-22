@@ -151,7 +151,7 @@ function handleFormSubmit(event) {
 }
 
 // 구글 앱스 스크립트 웹 앱 URL
-const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyLxrWNZRSW6ksjGWOaaC2zkCjN8i5YV6fZcH4LDFl0qq25k4FJczeDDLqXPg-eihvo/exec';
+const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyT4iBFzeRzabeVNk0rswWt5dfIDjR0NF4OWNApxB1ABC1ducZ4w6Ps9SYqW5TNLxLZ/exec';
 
 // 폼 제출 함수 (구글 앱스 스크립트 연동)
 async function submitForm() {
